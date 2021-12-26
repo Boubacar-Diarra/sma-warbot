@@ -1,0 +1,67 @@
+;;if (energy > 12000) [ new-RocketLauncher self ]
+  ;;if (mem6 > 0) [new-Harvester self set mem6 mem6 - 1]
+  ;;if (mem7 > 0) [new-RocketLauncher self set mem6 mem6 - 1]
+  ;;si le nombre de harvasters est inverieur a 5 on en produit de nouveau 5 de nouveau et que l'energie est suffisante (10000)
+  ;;if (energy > 10000) [new-Harvester self]
+  ;;produidure de nouveau missile lorsqu'il en reste plus. A chaque fois on en produit 3
+
+lors qu'un exporateur trouve une base, alors il transmets les infos de cette base a toutes les moissonseurs qu'ils croise. Ces derniers vont alors se rediriger uniquement vers cette base pour recolter la nourriture
+
+
+-------- la strategie principale serait d'essayer de faire la destructions des agents bases ennemie. Une fois que nous avons trouver les coordonner d'une base ennemie, tout les rochet lanceur qui seront former par devront se diriger vers cette base pour la detruitre.
+--------- les explorer feront un rapport quotidient pour prevenir la base si la base ennemie est detruite. Si c'est le cas alors elle arrte la production des roquette lancheurs et des exporateurs et se concentre uniquement sur la productions des moissoneurs pour faire la culture.
+
+reste plus qu'a programmer ca et a voir si cela ne va pas a l'encontre des contraintes données par le profs !
+
+
+
+;; en partant de l'hypothese que chacun fera la culture aupres de sa base, des qu'un explorer trouve une base ennemi alors elle le signal a tout les moissonneurs que l'on trouveras
+  let b one-of perceive-base ennemy
+  if (b != nobody)[set mem0 xcor set mem1 ycor] ;; faire l'initialisation des valeurs des variables de communication ici
+  let h one-of perceive-robots friend with [breed = Harvesters ]
+  if (h != nobody) and ([mem0] of h != min-pxcor) and ([mem1] of h != min-pycor)
+  [
+    let mem0Tampon mem0
+    let mem1Tampon mem1
+    ask h [set mem0 mem0Tampon]
+    ask h [set mem1 mem1Tampon]
+  ]
+
+
+
+;; comportement pour les explorer
+- si je n'ai plus assez d'energie je rentre a la base
+- si je trouve une base : j'appel les rocket launcher
+- si je trouve de la nourriture: j'appel les harvesters
+- si je croise un harvesters : je prend la nourriture qu'il transporte
+
+;; comprtement pour les roket launcher:
+- rentre a la base s'il n'ont plus d'energie ou de missile
+- il n'attaque uniquement que les bases : donc ferons des vas et viens uniquement entre leurs bases et les bases ennemies
+
+;; comportement des harvesters
+- on degage les mures autours de sa base
+- on met les mures autours de la base ennemy
+- s'ils n'ont plus d'energie alors retourne a la base
+- il plante a l'interieur de la zone de perception de la base que jusqu'a ce qu'il y'a des bases ennemie,
+	lorsqu'il y'a plus de base ennemie alors ils peuevent faire de la culture n'importe ou sur le terrain
+- lorsqu'ils n'ont pas de cible se diriger aleatoirement pour trouver de la nourriture, lorsqu'il y'a une cible aller uniquement vers cette cible
+
+;; comprtement de la base:
+- s'il n'y plus de base ennemie alors ne plus produire:
+	- d'exploer
+	- de rocket launcher
+
+- produit continuellement et indefinement des harvesters
+
+
+
+- l'avantage de l'attaque des bases uniquement c'est que ca empeche les bases de produire egalement de la nourriture
+- utiliser mem3 et mem4 de l'explorer pour faire la gestion de la nourriture
+- utiliser mem0 mem1 de l'explorer mem5 pour la gestion des des bases
+	ces deux condition vont ainsi permettre a l'explorer de guider a la fois les rl et harversers
+
+- donner la possibilité aux rocket launcher d'indiquer une base aux explorer au
+
+-- prochaine etape: avoir les performance de production de l'equipe verte, tout en ayant notre strategie militaire
+
