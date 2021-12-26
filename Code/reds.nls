@@ -6,11 +6,9 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 to red-team-go-back-to-base
-  ;; on depose des obstacle dans le camps ennemy
   ;; détermine la base la plus proche
   let b min-one-of my-bases [ distance myself ]
   if (b != nobody) [
-    ;; if ((breed = Harvesters) and (distance b > 10) and (distance b < 11)) [drop-wall]
     ;; si le robot est arrivé à la base
     ifelse (distance b <= 2)
       [ 
@@ -22,7 +20,6 @@ to red-team-go-back-to-base
         if ((Breed = RocketLaunchers) and (nb-missiles < 500)) [
           ask-for-missiles b self max-missiles - nb-missiles
         ]
-        set mem4 0
         ;; fait demi-tour
         rt 180
     ]
@@ -37,29 +34,15 @@ to red-team-go-back-to-base
 end
 
 to red-team-go-and-eat
-  ifelse (mem5 = 0) [
-    random-move
-  ]
-  [
-    ifelse (mem5 = 1 and breed != Explorers)
-    [ 
-      ifelse (distancexy mem0 mem1 > rocket-launcher-perception)
-      [
-        set heading towardsxy mem0 mem1
-        ifelse (free-ahead? speed = nobody) [ forward-move speed ][ rt random 360 if (free-ahead? 2 = nobody) [ forward-move speed ]]
-      ]
-      [ set mem5 0 ]
-    ]
-    [ random-move ]
-  ]
+  random-move
 end
 
 to red-team-harvesters-go-and-eat
   let w min-one-of (perceive-walls) [distance myself]
   let b min-one-of my-bases [ distance myself ]
   let eb min-one-of perceive-base ennemy [distance myself]
-  if ((w != nobody) and (distance b < 15)) [take-wall w] ;; on degage les mures autours de sa base
-  if ((eb != nobody) and ((distance eb < 11) and (distance eb > 10 ))) [ drop-wall show "i droped"] ;; on depose des obstacle dans le camps ennemy
+  if ((w != nobody) and (distance b < base-perception + 5)) [take-wall w] ;; on degage les mures autours de sa base
+  if (eb != nobody) [ drop-wall ] ;; on depose des obstacle dans le camps ennemy
   let f min-one-of perceive-food [ distance myself ]
   ifelse (f != nobody) [ 
     ifelse (distance f) <= 2
@@ -93,7 +76,7 @@ end
 to red-team-call-rocket-launcher [ x y espece ]
   ;;on demande aux robots le plus proche d'y aller
   let rl min-one-of perceive-specific-robots color RocketLaunchers [ distancexy x y ]
-  if (rl != nobody) [ ask rl [ red-team-set-target x y espece ]]
+  if (rl != nobody) [ ask rl [ red-team-set-target x y espece ] ]
 end
 
 to red-team-call-explorer [ x y espece ]
@@ -123,7 +106,7 @@ to red-team-select-target
 end
 
 to df-team-select-target
-  if (red-team-no-target?)
+  if (mem5 = 0)
   [
     let h min-one-of perceive-base ennemy [ distance myself ]
     ifelse ( h != nobody ) [
@@ -155,49 +138,65 @@ to df-team-set-food-target [ x y ]
 end
 
 to goRedExplorer
-  ifelse (energy < 500)
+  ifelse (energy < 500) or (carrying-food? > 1000)
   [ red-team-go-back-to-base ]
   [ red-team-go-and-eat ]
+  
   ;; si on repasse par le meme endroit et que la base n'existe plus alors on efface ces coordonnees
-  if (mem5 = 1) and (distancexy mem0 mem1 < explorer-perception) [
-    let b min-one-of perceive-base ennemy [ distancexy mem0 mem1 ]
-    if (b = nobody) [set mem5 0]
+  if ((item 0 mem1) = 1 ) and ((distancexy (item 0 mem0) (item 1 mem0)) < explorer-perception)
+  [
+    let b min-one-of perceive-base ennemy [ distancexy (item 0 mem0) (item 1 mem0) ]
+    if (b = nobody) [set mem1 list 0 0 ]
   ]
-  ;; recherche une cible
-  ifelse (mem5 = 0)[
-    ;; recherche une base
+  ;; mem0 et mem1 pour la gestion de la cible de type base
+  ifelse (item 0 mem1) = 0
+  [;; recherche une cible de type base
     let b min-one-of perceive-base ennemy [distance myself]
-    ifelse (b != nobody) [
-      set mem5 1 ;; mem5 pour dire que l'explorer s'occupe pour l'instant que des bases
-      set mem0 [xcor] of b
-      set mem1 [ycor] of b
-      set mem2 [breed] of b
-      let pt myself
-      ;show [mem0] of pt show [mem1] of pt show [mem2] of pt
-      let rl min-one-of perceive-specific-robots color RocketLaunchers [ distancexy mem0 mem1 ]
-      if (rl != nobody) [ ask rl [ red-team-set-target [mem0] of pt [mem1] of pt [mem2] of pt ]  ] ;; lorsqu'on trouve une base, on garde les cordonnées de cette base jusqu'a sa destruction
-    ][;; si non base, recherche nourriture
-      let food one-of perceive-food
-      if (food != nobody)[
-        set mem5 2
-        set mem0 [xcor] of food
-        set mem1 [ycor] of food
-        set mem2 [breed] of food
-        let pt myself ; prend la nourriture des harvesters croisser
-        let hs min-one-of perceive-specific-robots color Harvesters [distancexy mem0 mem1]
-        if (hs != nobody) [ask hs [ df-team-set-food-target [mem0] of pt [mem1] of pt ] set mem5 0 ]
-      ]
-    ] 
-  ][
-    let pt myself
-    ifelse (mem5 = 1)[;; a deja une cible de type base
-      let rl min-one-of perceive-specific-robots color RocketLaunchers [ distancexy mem0 mem1 ]
-      if (rl != nobody) [ ask rl [ red-team-set-target [mem0] of pt [mem1] of pt [mem2] of pt ]  ] ;; set mem5 0
-    ][;; a deja une cible de type nourriture
-      let hs min-one-of perceive-specific-robots color Harvesters [distancexy mem0 mem1]
-      if (hs != nobody) [ask hs [ df-team-set-food-target [mem0] of pt [mem1] of pt ] set mem5 0]
+    ifelse (b != nobody) 
+    [
+      set mem0 list ([xcor] of b) ([ycor] of b)
+      set mem1 list 1 ([breed] of b)
+      let x ([xcor] of b)
+      let y ([ycor] of b)
+      let espece ([breed] of b)
+      let rl min-one-of perceive-specific-robots color RocketLaunchers [ distancexy x y ]
+      if (rl != nobody) [ ask rl [ red-team-set-target x y espece ] ] ;; lorsqu'on trouve une base, on garde les cordonnées de cette base jusqu'a sa destruction
     ]
-  ] 
+    [;; on croise une rocket launcher et qu'on pas d'information sur une base et que cet rocket launcher a une info pour nous, alors il nous la passe
+      let rl one-of perceive-specific-robots color RocketLaunchers
+      if (rl != nobody and [mem5] of rl = 1)
+      [
+        set mem0 list ([mem0] of rl) ([mem1] of rl)
+        set mem1 list 1 ([breed] of (one-of my-bases))
+      ]
+    ]
+  ]
+  [;; il deja une base comme cible
+    let x (item 0 mem0)
+    let y (item 1 mem0)
+    let espece (item 1 mem1)
+    let rl min-one-of perceive-specific-robots color RocketLaunchers [ distancexy x y ]
+    if (rl != nobody) [ ask rl [ red-team-set-target x y espece ] ]
+  ]
+  
+  ;; si on trouve de la nourriture, on le signale aux agent que l'on croise, a condition que les agent n'on pas deja une cible
+  ;; mem2 et mem3 pour la gestion de la cible de type base
+  let food one-of perceive-food
+  if (food != nobody) ;; si on trouve de la nourriture, elle devient notre nouvelle cible
+  [
+    set mem2 list ([xcor] of food) ([ycor] of food)
+    set mem3 list 1 ([breed] of food)
+  ]
+  if (item 0 mem3) = 1 ;; si on a une cible de nourriture, on l'indique aux autres agents, on prend aussi la nourriture des elements croisser
+  [
+    let x (item 0 mem2)
+    let y (item 1 mem2)
+    let pt myself
+    let hs min-one-of perceive-specific-robots color Harvesters [distancexy x y]
+    if (hs != nobody) [ ask hs [ df-team-set-food-target x y give-food pt carrying-food? ] ]
+  ]
+  
+  
 end
 
 to goRedRocketLauncher
@@ -222,7 +221,7 @@ to goRedRocketLauncher
   ]
   [ 
     df-team-select-target ;; s'il pas encore recu d'infos de la part d'un explorer, alors il recherche tout seule comme un grand
-    ifelse (mem5 = 0)[ random-move ][ red-team-shoot ] 
+    ifelse (mem5 = 0)[ red-team-go-and-eat ][ red-team-shoot ] 
   ]
 end
 
@@ -237,10 +236,9 @@ to goRedHarvester
   ]
   
   ;; quand est ce qu'on rentre a la base ?
-  ifelse (mem4 = 1) or (carrying-food? > 500) or (energy < 100)
+  ifelse (carrying-food? > 500) or (energy < 100)
   [
     ; retour à la base
-    set mem4 1
     ;; rentre à la base si certaines conditions sont vérifiées
     red-team-go-back-to-base
     if (energy > 100) and (carrying-food? > 100) [ 
@@ -248,7 +246,7 @@ to goRedHarvester
       let b min-one-of my-bases [ distance myself ]
       if (b != nobody) [
         ;; si le robot est à moins de 10 de la base
-        if (distance b < 10)
+        if (distance b < base-perception)
           [ plant-seeds color max-seeds ]
       ]
     ]
@@ -309,8 +307,12 @@ end
 
 ;; procedure pour initialiser les explorers rouges
 to initRedExplorer
-  set mem0 min-pxcor
-  set mem1 min-pxcor
+  set mem0 list 0 0
+  set mem1 list 0 0
+  set mem2 list 0 0
+  set mem3 list 0 0
+  set mem4 list 0 0
+  set mem5 list 0 0
 end
 
 ;; procedure pour initialiser les rocket-launchers rouges
@@ -328,7 +330,7 @@ to initRedBase
   ;; au début on créer des harvesters pour pouvoir faire une premiere recolte de nourriture assez tot
   ;new-Harvester self
   new-Explorer self
-  set mem6 4
+  set mem6 3
   set mem7 4
-  set mem8 1
+  set mem8 2
 end
